@@ -156,11 +156,20 @@ read_cmip6 <-
   function(x){
     terra::rast(x) %T>%
       terra::set.ext(terra::ext(raster::brick(x[1]))) %>%
-      terra::rotate()
+      terra::shift(dx = -360)
   }
 
 cmip6_rasts <-
-  cmip6_ncss %>%
+  list.files("data-raw/nexgddp_cmip6/",
+             full.names = TRUE,
+             pattern = ".nc$") %>%
+  tibble::tibble(rast = .) %>%
+  dplyr::mutate(dat = 
+                  rast %>%
+                  basename() %>%
+                  tools::file_path_sans_ext()) %>%
+  tidyr::separate(dat, into = c("element", "timescale", "model","scenario","run","gn", "year"),
+                  sep = "_") %>%
   dplyr::group_by(model, scenario, run, element) %>%
   dplyr::summarise(rast = list(c(rast))) %>%
   dplyr::rowwise() %>%
