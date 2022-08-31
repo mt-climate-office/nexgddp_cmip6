@@ -81,7 +81,7 @@ cmip6_ncss <-
                 run,
                 element = dataset,
                 path) %>%
-  dplyr::filter(element %in% c("tasmin/","tasmax/","sfcWind/","pr/","hurs/")) %>%
+  # dplyr::filter(element %in% c("tasmin/","tasmax/","sfcWind/","pr/","hurs/")) %>%
   dplyr::rowwise() %>%
   dplyr::mutate(path = list(thredds::tds_list_datasets(path))) %>%
   tidyr::unnest(path) %>%
