@@ -1,9 +1,7 @@
 ## CMIP6
 library(magrittr)
-dir.create(file.path("data-raw",
-                     "nexgddp_cmip6"))
-dir.create(file.path("data-derived",
-                     "nexgddp_cmip6"))
+dir.create(data_raw)
+dir.create(data_derived)
 
 st_rotate <- function(x){
   x2 <- (sf::st_geometry(x) + c(360,90)) %% c(360) - c(0,90)
@@ -138,12 +136,12 @@ get_ncss <- function(x, out.path){
 }
 
 clust <- multidplyr::new_cluster(10)
-multidplyr::cluster_copy(clust, "get_ncss")
+multidplyr::cluster_copy(clust, c("get_ncss", "data_raw"))
 
 cmip6_ncss %<>%
   dplyr::rowwise() %>%
   multidplyr::partition(clust) %>%
-  dplyr::mutate(rast = get_ncss(ncss, out.path = file.path("data-raw", 
+  dplyr::mutate(rast = get_ncss(ncss, out.path = file.path(data_raw, 
                                                            "nexgddp_cmip6",
                                                            dataset))) %>%
   dplyr::collect()
@@ -160,7 +158,7 @@ read_cmip6 <-
   }
 
 cmip6_rasts <-
-  list.files("data-raw/nexgddp_cmip6/",
+  list.files(file.path(data_raw, "nexgddp_cmip6"),
              full.names = TRUE,
              pattern = ".nc$") %>%
   tibble::tibble(rast = .) %>%
@@ -192,7 +190,7 @@ cmip6_rasts2 <-
   dplyr::arrange(element, scenario) %>%
   dplyr::mutate(rast = write_cmip6(rast, 
                                    out_file = 
-                                     file.path("data-derived",
+                                     file.path(data_derived,
                                                "nexgddp_cmip6",
                                                paste0(model, "_",
                                                       scenario, "_",
