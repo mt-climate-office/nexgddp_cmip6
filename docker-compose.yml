@@ -5,6 +5,6 @@ services:
     nexgddp_cmip6:
         container_name: nexgddp_cmip6
         restart: always
-        image: rocker/r2u
+        image: rocker/geospatial
         volumes:
           - $PWD:/root
