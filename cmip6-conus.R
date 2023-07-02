@@ -1,8 +1,9 @@
 packages <- c("magrittr",
               "terra",
-              "tidyverse"
+              "tidyverse",
+              "multidplyr"
 )
-# purrr::walk(packages, devtools::install_cran)
+purrr::walk(packages, devtools::install_cran)
 purrr::walk(packages,
             library,
             character.only = TRUE)
