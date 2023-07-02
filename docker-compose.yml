@@ -2,14 +2,7 @@
 version: '3.9'
 
 services:
-    etr:
-        container_name: etr
+    nexgddp_cmip6:
+        container_name: nexgddp_cmip6
         restart: always
         image: rocker/geospatial
-        volumes:
-            - ${DATA_PATH}:/data
-            - ./etr:/scripts
-        ports:
-            - "8888:8787"
-        env_file:
-            - ./.env

@@ -1,7 +1,22 @@
-## CMIP6
-library(magrittr)
-dir.create(data_raw)
-dir.create(data_derived)
+cmip6_files <- 
+  readr::read_csv("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/gddp-cmip6-files.csv") %>%
+  dplyr::mutate(dataset = tools::file_path_sans_ext(basename(fileURL))) %>%
+  tidyr::separate_wider_delim(dataset, 
+                              names = c("element", "timestep", "model", "scenario", "run", "type", "year"), 
+                              delim = "_",
+                              cols_remove = FALSE) %>%
+  dplyr::mutate(dataset = paste0(dataset, ".nc")) %>% 
+  dplyr::select(model, scenario, run, year, element, dataset, aws = fileURL) %>%
+  dplyr::filter(model %in% 
+                  c("ACCESS-ESM1-5",
+                    "CNRM-ESM2-1",
+                    "EC-Earth3",
+                    "GFDL-ESM4",
+                    "GISS-E2-1-G",
+                    "MIROC6",
+                    "MPI-ESM1-2-HR",
+                    "MRI-ESM2-0")) %>%
+  dplyr::arrange(model, scenario, run, year, element, dataset)
 
 st_rotate <- function(x){
   x2 <- (sf::st_geometry(x) + c(360,90)) %% c(360) - c(0,90)
@@ -13,118 +28,6 @@ st_rotate <- function(x){
   return(x)
 }
 
-mt_bbox <- 
-  mcor::mt_state_simple %>%
-  sf::st_transform(4326) %>%
-  st_rotate() %>%
-  sf::st_bbox() %>%
-  as.list()
-
-mt_bbox$xmin %<>%
-  magrittr::subtract(0.25)
-
-mt_bbox$xmax %<>%
-  magrittr::add(0.25)
-
-mt_bbox$ymin %<>%
-  magrittr::subtract(0.25)
-
-mt_bbox$ymax %<>%
-  magrittr::add(0.25)
-
-# cmip6_bbox <-
-#   sf::read_sf("data-raw/fort_peck_geospatial.gpkg",
-#               layer = "reservation_bbox_10km_buffer") %>%
-#   sf::st_transform(4326) %>%
-#   st_rotate() %>%
-#   sf::st_bbox() %>%
-#   as.list()
-
-cmip6_ncss <-
-  thredds::tds_list_datasets("https://ds.nccs.nasa.gov/thredds/catalog/AMES/NEX/GDDP-CMIP6/catalog.html") %>%
-  dplyr::filter(type == "catalog") %>%
-  dplyr::filter(dataset %in% 
-                  paste0(c("ACCESS-CM2",
-                           "ACCESS-ESM1-5",
-                           "CNRM-ESM2-1",
-                           "EC-Earth3",
-                           "GFDL-ESM4",
-                           "GISS-E2-1-G",
-                           "MIROC6",
-                           "MPI-ESM1-2-HR",
-                           "MRI-ESM2-0"), "/")) %>%
-  dplyr::select(model = dataset,
-                path) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(path = list(thredds::tds_list_datasets(path))) %>%
-  tidyr::unnest(path) %>%
-  dplyr::filter(type == "catalog") %>%
-  dplyr::select(model,
-                scenario = dataset,
-                path) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(path = list(thredds::tds_list_datasets(path))) %>%
-  tidyr::unnest(path) %>%
-  dplyr::filter(type == "catalog") %>%
-  dplyr::select(model,
-                scenario,
-                run = dataset,
-                path) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(path = list(thredds::tds_list_datasets(path))) %>%
-  tidyr::unnest(path) %>%
-  dplyr::filter(type == "catalog") %>%
-  dplyr::select(model,
-                scenario,
-                run,
-                element = dataset,
-                path) %>%
-  # dplyr::filter(element %in% c("tasmin/","tasmax/","sfcWind/","pr/","hurs/")) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(path = list(thredds::tds_list_datasets(path))) %>%
-  tidyr::unnest(path) %>%
-  dplyr::select(model,
-                scenario,
-                run,
-                element,
-                dataset) %>%
-  dplyr::filter(stringr::str_detect(dataset, ".nc")) %>%
-  dplyr::mutate(dplyr::across(model:element, ~stringr::str_remove(.x, "/"))) %>%
-  dplyr::mutate(year = stringr::str_extract(dataset, "\\d{4}.nc") %>%
-                  stringr::str_remove(".nc") %>%
-                  as.integer()) %>%
-  dplyr::select(model,
-                scenario,
-                run,
-                year,
-                element,
-                dataset) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(
-    ncss = 
-      paste0("https://ds.nccs.nasa.gov/thredds/ncss/AMES/NEX/GDDP-CMIP6/",
-             model,"/", 
-             scenario, "/",
-             run,"/",
-             element,"/",
-             dataset) %>%
-      httr::modify_url(
-        query = list(
-          var = element,
-          north = mt_bbox$ymax,
-          west = mt_bbox$xmin,
-          east = mt_bbox$xmax,
-          south = mt_bbox$ymin,
-          disableProjSubset = "on",
-          horizStride = 1,
-          time_start = paste0(year, "-01-01"),
-          time_end = paste0(year, "-12-31"),
-          timeStride = 1,
-          addLatLon = TRUE
-        ))
-  )
-
-
 get_ncss <- function(x, out.path){
   
   if(file.exists(out.path))
@@ -135,75 +38,116 @@ get_ncss <- function(x, out.path){
   return(out.path)
 }
 
-clust <- multidplyr::new_cluster(10)
-multidplyr::cluster_copy(clust, c("get_ncss", "data_raw"))
+options(timeout = max(300, getOption("timeout")))
 
-cmip6_ncss %<>%
-  dplyr::rowwise() %>%
-  multidplyr::partition(clust) %>%
-  dplyr::mutate(rast = get_ncss(ncss, out.path = file.path(data_raw, 
-                                                           "nexgddp_cmip6",
-                                                           dataset))) %>%
-  dplyr::collect()
-
-rm(clust)
-gc()
-gc()
-
-read_cmip6 <- 
-  function(x){
-    terra::rast(x) %T>%
-      terra::set.ext(terra::ext(raster::brick(x[1]))) %>%
-      terra::shift(dx = -360)
+get_cmip6 <- 
+  function(x, outdir){
+    x %<>%
+      sf::st_transform(4326) %>%
+      st_rotate() %>%
+      sf::st_bbox() %>%
+      as.list()
+    
+    clust <- multidplyr::new_cluster(10)
+    multidplyr::cluster_library(clust, "magrittr")
+    multidplyr::cluster_copy(clust, c("get_ncss", "outdir"))
+    
+    out <-
+      cmip6_files %>%
+      dplyr::rowwise() %>%
+      multidplyr::partition(clust) %>%
+      dplyr::mutate(rast = get_ncss(httr::modify_url(
+        paste0("https://ds.nccs.nasa.gov/thredds/ncss/AMES/NEX/GDDP-CMIP6/",
+               model,"/", 
+               scenario, "/",
+               run,"/",
+               element,"/",
+               dataset),
+        query = list(
+          var = element,
+          north = x$ymax,
+          west = x$xmin,
+          east = x$xmax,
+          south = x$ymin,
+          disableProjSubset = "on",
+          horizStride = 1,
+          time_start = paste0(year, "-01-01"),
+          time_end = paste0(as.integer(year) + 1, "-01-01"),
+          timeStride = 1,
+          addLatLon = TRUE
+        )), 
+        out.path = file.path(outdir,
+                             dataset))) %>%
+      dplyr::collect()
+    
+    rm(clust)
+    gc()
+    gc()
+    return(out)
   }
 
-cmip6_rasts <-
-  list.files(file.path(data_raw, "nexgddp_cmip6"),
-             full.names = TRUE,
-             pattern = ".nc$") %>%
-  tibble::tibble(rast = .) %>%
-  dplyr::mutate(dat = 
-                  rast %>%
-                  basename() %>%
-                  tools::file_path_sans_ext()) %>%
-  tidyr::separate(dat, into = c("element", "timescale", "model","scenario","run","gn", "year"),
-                  sep = "_") %>%
-  dplyr::group_by(model, scenario, run, element) %>%
-  dplyr::summarise(rast = list(c(rast))) %>%
-  dplyr::rowwise() %>%
-  dplyr::mutate(rast = list(read_cmip6(rast)))
+get_aws <- function(x, mask, out.path){
   
-write_cmip6 <- 
-  function(x, out_file){
-    terra::writeRaster(x,
-                       filename = out_file,
-                       overwrite = TRUE, 
-                       gdal = c("COMPRESS=DEFLATE", "of=COG"),
-                       memfrac = 0.9)
-    return(out_file)
+  if(file.exists(out.path))
+    return(out.path)
+  
+  tmpout <- tempfile(fileext = ".nc")
+  
+  download.file(x,
+                destfile = tmpout,
+                quiet = TRUE,
+                mode = "wb")
+  
+  out <- 
+    terra::rast(tmpout) %>%
+    terra::crop(mask, 
+                snap = "out", 
+                mask = TRUE) 
+  
+  terra::writeCDF(out,
+                  varname = terra::varnames(terra::rast(tmpout))[[1]],
+                  longname = terra::longnames(terra::rast(tmpout))[[1]],
+                  unit = terra::units(terra::rast(tmpout))[[1]],
+                  filename = out.path,
+                  compression = 6,
+                  overwrite = TRUE)
+  
+  unlink(tmpout)
+  
+  return(out.path)
+}
+
+
+get_cmip6_aws <-
+  function(x, outdir){
+    x %<>%
+      sf::st_transform(4326) %>%
+      st_rotate()
+    
+    clust <- multidplyr::new_cluster(10)
+    multidplyr::cluster_library(clust, "magrittr")
+    multidplyr::cluster_copy(clust, c("get_aws", "outdir"))
+    
+    out <-
+      cmip6_files %>%
+      dplyr::rowwise() %>%
+      multidplyr::partition(clust) %>%
+      dplyr::mutate(
+        rast = tryCatch(
+          get_aws(
+            aws,
+            mask = x,
+            out.path = file.path(outdir,
+                                 dataset)),
+          error = function(e){return(NA)}
+          
+        )
+      ) %>%
+      dplyr::collect()
+    
+    rm(clust)
+    gc()
+    gc()
+    return(out)
   }
 
-
-
-cmip6_rasts2 <-
-  cmip6_rasts %>%
-  dplyr::arrange(element, scenario) %>%
-  dplyr::mutate(rast = write_cmip6(rast, 
-                                   out_file = 
-                                     file.path(data_derived,
-                                               "nexgddp_cmip6",
-                                               paste0(model, "_",
-                                                      scenario, "_",
-                                                      run, "_",
-                                                      element, ".tif"))))
-
-
-# 
-# 
-# test_ncss$ncss[[1]] %>%
-#   httr::GET(httr::write_disk("data-raw/nexgddp_cmip6/tasmin_day_MRI-ESM2-0_ssp585_r1i1p1f1_gn_2100.nc",
-#                              overwrite = TRUE))
-# 
-# out <- 
-#   terra::rast("data-raw/nexgddp_cmip6/tasmin_day_MRI-ESM2-0_ssp585_r1i1p1f1_gn_2100.nc") %T>%
-#   terra::set.ext(terra::ext(raster::brick("data-raw/nexgddp_cmip6/tasmin_day_MRI-ESM2-0_ssp585_r1i1p1f1_gn_2100.nc")))
