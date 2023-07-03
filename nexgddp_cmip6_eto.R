@@ -3,8 +3,6 @@ library(magrittr)
 devtools::install_github("mt-climate-office/ETo")
 library(ETo)
 library(terra)
-dir.create(data_raw)
-dir.create(data_derived)
 
 calc_eto <- function(x, outfile){
   if(file.exists(outfile)){
