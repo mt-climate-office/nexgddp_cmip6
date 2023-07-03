@@ -1,6 +1,7 @@
 ## CMIP6
 library(magrittr)
 devtools::install_github("mt-climate-office/ETo")
+devtools::install_cran("furrr")
 library(ETo)
 library(terra)
 
@@ -55,7 +56,7 @@ calc_eto <- function(x, outfile){
 elev <- terra::rast("elev_conus.tif")
 
 library(multidplyr)
-cl <- multidplyr::new_cluster(10)
+cl <- multidplyr::new_cluster(min(50, future::availableCores() - 1))
 multidplyr::cluster_library(cl, "magrittr")
 multidplyr::cluster_copy(cl, "calc_eto")
 multidplyr::cluster_send(cl, elev <- terra::rast("elev_conus.tif"))
