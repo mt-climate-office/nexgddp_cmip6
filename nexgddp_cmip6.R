@@ -54,30 +54,33 @@ get_cmip6 <-
     
     out <-
       cmip6_files %>%
+      dplyr::filter(!file.exists(file.path(outdir, dataset))) %>%
       dplyr::rowwise() %>%
       multidplyr::partition(clust) %>%
-      dplyr::mutate(rast = get_ncss(httr::modify_url(
-        paste0("https://ds.nccs.nasa.gov/thredds/ncss/AMES/NEX/GDDP-CMIP6/",
-               model,"/", 
-               scenario, "/",
-               run,"/",
-               element,"/",
-               dataset),
-        query = list(
-          var = element,
-          north = x$ymax,
-          west = x$xmin,
-          east = x$xmax,
-          south = x$ymin,
-          disableProjSubset = "on",
-          horizStride = 1,
-          time_start = paste0(year, "-01-01"),
-          time_end = paste0(as.integer(year) + 1, "-01-01"),
-          timeStride = 1,
-          addLatLon = TRUE
-        )), 
-        out.path = file.path(outdir,
-                             dataset))) %>%
+      dplyr::mutate(
+        rast = get_ncss(
+          httr::modify_url(
+            paste0("https://ds.nccs.nasa.gov/thredds/ncss/AMES/NEX/GDDP-CMIP6/",
+                   model,"/", 
+                   scenario, "/",
+                   run,"/",
+                   element,"/",
+                   dataset),
+            query = list(
+              var = element,
+              north = x$ymax,
+              west = x$xmin,
+              east = x$xmax,
+              south = x$ymin,
+              disableProjSubset = "on",
+              horizStride = 1,
+              time_start = paste0(year, "-01-01"),
+              time_end = paste0(as.integer(year) + 1, "-01-01"),
+              timeStride = 1,
+              addLatLon = TRUE
+            )), 
+          out.path = file.path(outdir,
+                               dataset))) %>%
       dplyr::collect()
     
     rm(clust)
