@@ -1,6 +1,6 @@
 ## CMIP6
 library(magrittr)
-# devtools::install_github("mt-climate-office/ETo")
+devtools::install_github("mt-climate-office/ETo")
 library(ETo)
 library(terra)
 dir.create(data_raw)
