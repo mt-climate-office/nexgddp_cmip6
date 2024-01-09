@@ -1,8 +1,9 @@
 cmip6_files <- 
-  readr::read_csv("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/gddp-cmip6-files.csv") %>%
+  readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_v1.1_md5.txt",
+                    col_names = c("md5", "fileURL")) %>%
   dplyr::mutate(dataset = tools::file_path_sans_ext(basename(fileURL))) %>%
   tidyr::separate_wider_delim(dataset, 
-                              names = c("element", "timestep", "model", "scenario", "run", "type", "year"), 
+                              names = c("element", "timestep", "model", "scenario", "run", "type", "year", "version"), 
                               delim = "_",
                               cols_remove = FALSE) %>%
   dplyr::mutate(dataset = paste0(dataset, ".nc")) %>% 
@@ -41,14 +42,14 @@ get_ncss <- function(x, out.path){
 options(timeout = max(300, getOption("timeout")))
 
 get_cmip6 <- 
-  function(x, outdir){
+  function(x, outdir, workers = 10){
     x %<>%
       sf::st_transform(4326) %>%
       st_rotate() %>%
       sf::st_bbox() %>%
       as.list()
     
-    clust <- multidplyr::new_cluster(10)
+    clust <- multidplyr::new_cluster(workers)
     multidplyr::cluster_library(clust, "magrittr")
     multidplyr::cluster_copy(clust, c("get_ncss", "outdir"))
     
@@ -59,8 +60,8 @@ get_cmip6 <-
       multidplyr::partition(clust) %>%
       dplyr::mutate(
         rast = get_ncss(
-          httr::modify_url(
-            paste0("https://ds.nccs.nasa.gov/thredds/ncss/AMES/NEX/GDDP-CMIP6/",
+          x = httr::modify_url(
+            paste0("https://ds.nccs.nasa.gov/thredds/ncss/grid/AMES/NEX/GDDP-CMIP6/",
                    model,"/", 
                    scenario, "/",
                    run,"/",
@@ -89,45 +90,25 @@ get_cmip6 <-
     return(out)
   }
 
-get_aws <- function(x, mask, out.path){
-  
-  if(file.exists(out.path))
+get_aws <- 
+  function(x, out.path){
+    
+    if(file.exists(out.path))
+      return(out.path)
+    
+    file.path("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com", x) %>%
+      httr2::request() %>%
+      httr2::req_perform(path = out.path,
+                         verbosity = 0)
+    
     return(out.path)
-  
-  tmpout <- tempfile(fileext = ".nc")
-  
-  download.file(x,
-                destfile = tmpout,
-                quiet = TRUE,
-                mode = "wb")
-  
-  out <- 
-    terra::rast(tmpout) %>%
-    terra::crop(mask, 
-                snap = "out", 
-                mask = TRUE) 
-  
-  terra::writeCDF(out,
-                  varname = terra::varnames(terra::rast(tmpout))[[1]],
-                  longname = terra::longnames(terra::rast(tmpout))[[1]],
-                  unit = terra::units(terra::rast(tmpout))[[1]],
-                  filename = out.path,
-                  compression = 6,
-                  overwrite = TRUE)
-  
-  unlink(tmpout)
-  
-  return(out.path)
-}
+  }
 
 
 get_cmip6_aws <-
-  function(x, outdir){
-    x %<>%
-      sf::st_transform(4326) %>%
-      st_rotate()
+  function(outdir, workers = 10){
     
-    clust <- multidplyr::new_cluster(10)
+    clust <- multidplyr::new_cluster(workers)
     multidplyr::cluster_library(clust, "magrittr")
     multidplyr::cluster_copy(clust, c("get_aws", "outdir"))
     
@@ -139,7 +120,6 @@ get_cmip6_aws <-
         rast = tryCatch(
           get_aws(
             aws,
-            mask = x,
             out.path = file.path(outdir,
                                  dataset)),
           error = function(e){return(NA)}
@@ -154,3 +134,58 @@ get_cmip6_aws <-
     return(out)
   }
 
+get_s3 <- 
+  function(x, s3_path, out.path){
+    
+    if(file.exists(out.path))
+      return(out.path)
+    
+    s3_path %>%
+      terra::rast() %>%
+      terra::crop(x,
+                  snap = "out",
+                  mask = TRUE,
+                  filename = out.path,
+                  overwrite = TRUE,
+                  gdal = c("COMPRESS=DEFLATE")
+      )
+    
+    return(out.path)
+  }
+
+
+get_cmip6_s3 <-
+  function(x, outdir, s3_mount, workers = 10){
+    
+    clust <- multidplyr::new_cluster(workers)
+    multidplyr::cluster_library(clust, "magrittr")
+    multidplyr::cluster_copy(clust, c("get_s3", "s3_mount", "outdir"))
+    
+    out <-
+      cmip6_files[1,] %>%
+      dplyr::rowwise() %>%
+      multidplyr::partition(clust) %>%
+      dplyr::mutate(
+        rast = tryCatch(
+          get_s3(
+            x = x,
+            s3_path = file.path(s3_mount, aws),
+            out.path = file.path(outdir,
+                                 dataset)),
+          error = function(e){return(NA)}
+          
+        )
+      ) %>%
+      dplyr::collect()
+    
+    rm(clust)
+    gc()
+    gc()
+    return(out)
+  }
+
+get_s3(
+  x = x,
+  s3_path = file.path(s3_mount, cmip6_files$aws[[1]]),
+  out.path = file.path(outdir,
+                       cmip6_files$dataset[[1]]))

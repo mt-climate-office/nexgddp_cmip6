@@ -12,8 +12,8 @@ calc_eto <- function(x, outfile){
   
   # Convert from K to C
   x$tas <- x$tas - 273.15
-  x$tasmax <- x$tasmax - 273.15
-  x$tasmin <- x$tasmin - 273.15
+  # x$tasmax <- x$tasmax - 273.15
+  # x$tasmin <- x$tasmin - 273.15
   x$hurs %<>% terra::clamp(lower = 0, upper = 100)
   
   junk <-
@@ -70,7 +70,7 @@ x <-
                   rast %>%
                   basename() %>%
                   tools::file_path_sans_ext()) %>%
-  tidyr::separate(dat, into = c("element", "timescale", "model","scenario","run","gn", "year"),
+  tidyr::separate(dat, into = c("element", "timescale", "model","scenario","run","gn", "year", "version"),
                   sep = "_") %>%
   dplyr::group_by(model, scenario, run, year) %>%
   dplyr::arrange(model, scenario, run, year) %>%
