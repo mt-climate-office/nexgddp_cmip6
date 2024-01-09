@@ -1,13 +1,19 @@
 cmip6_files <- 
   readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_v1.1_md5.txt",
                     col_names = c("md5", "fileURL")) %>%
+  dplyr::bind_rows(
+    readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_md5.txt",
+                      col_names = c("md5", "fileURL"))
+  ) %>%
   dplyr::mutate(dataset = tools::file_path_sans_ext(basename(fileURL))) %>%
   tidyr::separate_wider_delim(dataset, 
                               names = c("element", "timestep", "model", "scenario", "run", "type", "year", "version"), 
                               delim = "_",
-                              cols_remove = FALSE) %>%
-  dplyr::mutate(dataset = paste0(dataset, ".nc")) %>% 
-  dplyr::select(model, scenario, run, year, element, dataset, aws = fileURL) %>%
+                              cols_remove = FALSE,
+                              too_few = "align_start") %>%
+  dplyr::mutate(dataset = paste0(dataset, ".nc"),
+                version = tidyr::replace_na(version, "v1.0")) %>% 
+  dplyr::select(model, scenario, run, year, element, dataset, version, aws = fileURL) %>%
   dplyr::filter(model %in% 
                   c("ACCESS-ESM1-5",
                     "CNRM-ESM2-1",
@@ -17,7 +23,8 @@ cmip6_files <-
                     "MIROC6",
                     "MPI-ESM1-2-HR",
                     "MRI-ESM2-0")) %>%
-  dplyr::arrange(model, scenario, run, year, element, dataset)
+  dplyr::arrange(model, scenario, run, year, element, dplyr::desc(version)) %>%
+  dplyr::distinct(model, scenario, run, year, element, .keep_all = TRUE)
 
 st_rotate <- function(x){
   x2 <- (sf::st_geometry(x) + c(360,90)) %% c(360) - c(0,90)
