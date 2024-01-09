@@ -12,9 +12,9 @@ purrr::walk(packages,
 source("nexgddp_cmip6.R")
 
 dir.create(
-  file.path("conus_s3")
+  file.path("conus")
 )
-usethis::use_git_ignore("conus_s3")
+usethis::use_git_ignore("conus")
 
 # https://prd-tnm.s3.amazonaws.com/StagedProducts/Hydrography/WBD/National/GDB/WBD_National_GDB.zip
 # conus <- sf::read_sf("~/Downloads/WBD_National_GDB/WBD_National_GDB.gdb/", "WBDHU2") %>%
