@@ -33,29 +33,6 @@ usethis::use_git_ignore("conus_s3")
 #     sf::write_sf("conus_huc2_real.fgb")
 
 conus <- 
-  sf::read_sf("conus_huc2.fgb") %>%
-  sf::st_transform(4326) %>%
-  st_rotate()
-
-get_cmip6_s3(x = conus, 
-             s3_mount = "/private/tmp/cmip6", 
-             outdir = file.path("conus_s3"), 
-             workers = 20)
+  sf::read_sf("conus_huc2.fgb")
 
 get_cmip6(conus, outdir = file.path("conus"), workers = 20)
-
-library(terra)
-cmip6_files
-
-test <- 
-  terra::rast("/private/tmp/cmip6/NEX-GDDP-CMIP6/ACCESS-ESM1-5/ssp126/r1i1p1f1/tas/tas_day_ACCESS-ESM1-5_ssp126_r1i1p1f1_gn_2015_v1.1.nc") %>%
-  terra::crop(x,
-              snap = "out",
-              mask = TRUE,
-              filename = "paleocar_v3/ppt_water_year/cube_v3.zarr",
-              overwrite = TRUE,
-              gdal = c("FORMAT=ZARR_V3"),
-              filetype = "Zarr",
-              NAflag = NA
-              )
-  

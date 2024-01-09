@@ -184,8 +184,9 @@ get_cmip6_s3 <-
     return(out)
   }
 
-get_s3(
-  x = x,
-  s3_path = file.path(s3_mount, cmip6_files$aws[[1]]),
-  out.path = file.path(outdir,
-                       cmip6_files$dataset[[1]]))
+# get_s3(
+#   x = x,
+#   s3_path = file.path(s3_mount, cmip6_files$aws[[1]]),
+#   out.path = file.path(outdir,
+#                        cmip6_files$dataset[[1]])
+#   )
