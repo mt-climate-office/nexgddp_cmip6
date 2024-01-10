@@ -22,7 +22,14 @@ cmip6_files <-
                     "GISS-E2-1-G",
                     "MIROC6",
                     "MPI-ESM1-2-HR",
-                    "MRI-ESM2-0")) %>%
+                    "MRI-ESM2-0")#,
+                # element %in%
+                #   c("tas",
+                #     "rsds",
+                #     "hurs",
+                #     "sfcWind",
+                #     "pr")
+                ) %>%
   dplyr::arrange(model, scenario, run, year, element, dplyr::desc(version)) %>%
   dplyr::distinct(model, scenario, run, year, element, .keep_all = TRUE)
 

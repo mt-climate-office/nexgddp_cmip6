@@ -1,10 +1,15 @@
-packages <- c("magrittr",
-              "terra",
-              "tidyverse",
-              "multidplyr",
-              "sf"
-)
-purrr::walk(packages, devtools::install_cran)
+# install.packages("pak")
+packages <- 
+  c(
+    "magrittr",
+    "terra",
+    "tidyverse",
+    "multidplyr",
+    "sf"
+  )
+
+pak::pkg_install(packages)
+
 purrr::walk(packages,
             library,
             character.only = TRUE)
@@ -36,4 +41,4 @@ usethis::use_git_ignore("conus")
 conus <- 
   sf::read_sf("conus_huc2.fgb")
 
-get_cmip6(conus, outdir = file.path("conus"), workers = 20)
+get_cmip6(conus, outdir = file.path("conus"), workers = 10)
