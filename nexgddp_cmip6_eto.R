@@ -2,7 +2,8 @@
 packages <- 
   c(
     "mt-climate-office/ETo",
-    "furrr"
+    "furrr",
+    "ncdf4"
   )
 
 pak::pkg_install(packages)
@@ -59,43 +60,40 @@ calc_eto <-
     
   }
 
-### TEST
-test <-
-  list.files("conus",
-           full.names = TRUE,
-           pattern = ".nc$") %>%
-  tibble::tibble(rast = .) %>%
-  dplyr::mutate(dat = 
-                  rast %>%
-                  basename() %>%
-                  tools::file_path_sans_ext()) %>%
-  # tidyr::separate(dat, into = c("element", "timescale", "model","scenario","run","gn", "year", "version"),
-  #                 sep = "_") %>%
-  tidyr::separate_wider_delim(dat, 
-                              names = c("element", "timestep", "model", "scenario", "run", "type", "year", "version"), 
-                              delim = "_",
-                              cols_remove = FALSE,
-                              too_few = "align_start") %>%
-  dplyr::filter(model == "ACCESS-ESM1-5",
-                scenario == "historical",
-                year == 1950) %>%
-  dplyr::group_by(model, scenario, run, year) %>%
-  dplyr::arrange(model, scenario, run, year) %>%
-  dplyr::summarise(eto = 
-                     rast %>%
-                     purrr::map(terra::rast) %>%
-                     magrittr::set_names(element) %>%
-                     calc_eto(outfile = paste0(dirname(rast[[1]]),
-                                               "/",
-                                               paste("eto", timestep, model, scenario, run, type, year, "v1.1", sep = "_")[[1]],
-                                               ".nc"),
-                              force = TRUE)) %$%
-  terra::rast(eto)
-
-plot(test[[90]], range = c(0,20))
-
-
-
+# ### TEST
+# test <-
+#   list.files("conus",
+#            full.names = TRUE,
+#            pattern = ".nc$") %>%
+#   tibble::tibble(rast = .) %>%
+#   dplyr::mutate(dat = 
+#                   rast %>%
+#                   basename() %>%
+#                   tools::file_path_sans_ext()) %>%
+#   # tidyr::separate(dat, into = c("element", "timescale", "model","scenario","run","gn", "year", "version"),
+#   #                 sep = "_") %>%
+#   tidyr::separate_wider_delim(dat, 
+#                               names = c("element", "timestep", "model", "scenario", "run", "type", "year", "version"), 
+#                               delim = "_",
+#                               cols_remove = FALSE,
+#                               too_few = "align_start") %>%
+#   dplyr::filter(model == "ACCESS-ESM1-5",
+#                 scenario == "historical",
+#                 year == 1950) %>%
+#   dplyr::group_by(model, scenario, run, year) %>%
+#   dplyr::arrange(model, scenario, run, year) %>%
+#   dplyr::summarise(eto = 
+#                      rast %>%
+#                      purrr::map(terra::rast) %>%
+#                      magrittr::set_names(element) %>%
+#                      calc_eto(outfile = paste0(dirname(rast[[1]]),
+#                                                "/",
+#                                                paste("eto", timestep, model, scenario, run, type, year, "v1.1", sep = "_")[[1]],
+#                                                ".nc"),
+#                               force = TRUE)) %$%
+#   terra::rast(eto)
+# 
+# plot(test[[90]], range = c(0,20))
 
 library(multidplyr)
 cl <- multidplyr::new_cluster(min(50, future::availableCores() - 1))
