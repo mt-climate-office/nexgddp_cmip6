@@ -14,3 +14,7 @@ LaTeX: pdfLaTeX
 
 QuitChildProcessesOnExit: Yes
 DisableExecuteRprofile: Yes
+
+PythonType: virtualenv
+PythonVersion: 3.12.4
+PythonPath: bin/python

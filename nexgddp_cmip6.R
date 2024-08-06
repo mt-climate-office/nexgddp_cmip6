@@ -1,10 +1,13 @@
 cmip6_files <- 
-  readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_v1.1_md5.txt",
-                    col_names = c("md5", "fileURL")) %>%
-  dplyr::bind_rows(
+  list(
+    readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_v1.2_md5.txt",
+                      col_names = c("md5", "fileURL")),
+    readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_v1.1_md5.txt",
+                      col_names = c("md5", "fileURL")),
     readr::read_table("https://nex-gddp-cmip6.s3-us-west-2.amazonaws.com/index_md5.txt",
                       col_names = c("md5", "fileURL"))
   ) %>%
+  dplyr::bind_rows() %>%
   dplyr::mutate(dataset = tools::file_path_sans_ext(basename(fileURL))) %>%
   tidyr::separate_wider_delim(dataset, 
                               names = c("element", "timestep", "model", "scenario", "run", "type", "year", "version"), 
@@ -204,3 +207,6 @@ get_cmip6_s3 <-
 #   out.path = file.path(outdir,
 #                        cmip6_files$dataset[[1]])
 #   )
+
+
+
